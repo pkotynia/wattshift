@@ -11,7 +11,6 @@ class EnergyPriceEntry(BaseModel):
 
     @property
     def price_pln_kwh(self) -> float:
-        """Przeliczenie stawki z MWh na kWh (bardziej czytelne dla domu)"""
         return self.price_pln_mwh / 1000.0
 
 
@@ -20,7 +19,6 @@ async def fetch_pse_rce(target_date: str | None = None) -> list[dict]:
         target_date = datetime.now().strftime("%Y-%m-%d")
 
     url = "https://api.raporty.pse.pl/api/rce-pln"
-    # Doba ma 96 kwadransów po 15 min
     params = {
         "$filter": f"business_date eq '{target_date}'",
         "$first": 96,
@@ -40,28 +38,26 @@ async def fetch_pse_rce(target_date: str | None = None) -> list[dict]:
 
 async def main():
     today = datetime.now().strftime("%Y-%m-%d")
-    print(f"Pobieranie 15-minutowych stawek z PSE dla daty {today}...")
+    print(f"Fetching 15 min slots from PSE for date {today}...")
     try:
         records = await fetch_pse_rce(today)
         if not records:
-            print("Brak opublikowanych danych dla podanej daty.")
+            print("No published data for given date")
             return
 
-        print(f"Łącznie pobrano punktów pomiarowych: {len(records)}\n")
-        # Wyświetlamy pierwsze 8 kwadransów (pierwsze 2 godziny doby)
         for item in records[:8]:
             entry = EnergyPriceEntry.model_validate(item)
             print(
-                f"Przedział: {entry.period_range:<13} | "
-                f"Cena MWh: {entry.price_pln_mwh:>8.2f} zł | "
-                f"Cena kWh: {entry.price_pln_kwh:>6.3f} zł"
+                f"Period range: {entry.period_range:<13} | "
+                f"Price MWh: {entry.price_pln_mwh:>8.2f} PLN | "
+                f"Price kWh: {entry.price_pln_kwh:>6.3f} PLN"
             )
 
         print("\nSukces! Model Pydantic zmapował dane bezbłędnie.")
     except httpx.HTTPStatusError as e:
-        print(f"Błąd HTTP: {e.response.status_code} - {e.response.text}")
+        print(f"HTTP error: {e.response.status_code} - {e.response.text}")
     except Exception as e:
-        print(f"Nieoczekiwany błąd: {e}")
+        print(f"Unexpected error: {e}")
 
 
 if __name__ == "__main__":
